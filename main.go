@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -25,9 +26,12 @@ var collection *mongo.Collection // Pointer to MongoDB Collection
 
 func main() {
 	fmt.Println("Hello World")
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Error loading .env file:", err)
+	if os.Getenv("ENV") != "production" {
+		// Load the .env file if not in production
+		err := godotenv.Load(".env")
+		if err != nil {
+			log.Fatal("Error loading .env file:", err)
+		}
 	}
 
 	// Connect to MongoDB Database
@@ -39,7 +43,7 @@ func main() {
 	}
 	defer client.Disconnect(context.Background())
 
-	// Check connection with "Ping" method
+	// Check the connection with "Ping" method
 	err = client.Ping(context.Background(), nil)
 	if err != nil {
 		log.Fatal(err)
@@ -49,6 +53,10 @@ func main() {
 	collection = client.Database("golang_db").Collection("todos")
 
 	app := fiber.New()
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "http://localhost:5173",
+		AllowHeaders: "Origin, Content-Type, Accept",
+	}))
 	app.Get("/api/todos", getTodos)
 	app.Post("/api/todos", createTodos)
 	app.Patch("/api/todos/:id", updateTodos)
@@ -57,6 +65,10 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "5001"
+	}
+	// ถ้าอยู่ที่ production จะเปลี่ยนเป็น static และถ้าไม่ได้เข้ามาที่ route ของ backend >> จะพาไป FE
+	if os.Getenv("ENV") == "production" {
+		app.Static("/", "./client/dist")
 	}
 	log.Fatal(app.Listen("0.0.0.0:" + port))
 }
